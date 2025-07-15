@@ -1297,6 +1297,12 @@ type Mutation {
   setBlob(blob: Upload!, workspaceId: String!): String!
   submitAudioTranscription(blob: Upload, blobId: String!, blobs: [Upload!], workspaceId: String!): TranscriptionResultType
 
+  """Trigger cleanup of trashed doc embeddings"""
+  triggerCleanupTrashedDocEmbeddings: Boolean!
+
+  """Trigger generate missing titles cron job"""
+  triggerGenerateTitleCron: Boolean!
+
   """update app configuration"""
   updateAppConfig(updates: [UpdateAppConfigInput!]!): JSONObject!
 
@@ -1518,6 +1524,9 @@ type PublicUserType {
 type Query {
   """get the whole app configuration"""
   appConfig: JSONObject!
+
+  """Apply updates to a doc using LLM and return the merged markdown."""
+  applyDocUpdates(docId: String!, op: String!, updates: String!, workspaceId: String!): String!
   collectAllBlobSizes: WorkspaceBlobSizes! @deprecated(reason: "use `user.quotaUsage` instead")
 
   """Get current user"""

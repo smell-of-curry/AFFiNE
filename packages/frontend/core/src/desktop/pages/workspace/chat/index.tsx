@@ -94,6 +94,7 @@ export const Component = () => {
   const chatToolContainerRef = useRef<HTMLDivElement>(null);
   const widthSignalRef = useRef<Signal<number>>(signal(0));
   const client = useCopilotClient();
+  const workbench = useService(WorkbenchService).workbench;
 
   const workspaceId = useService(WorkspaceService).workspace.id;
 
@@ -147,6 +148,15 @@ export const Component = () => {
     }
   }, [client, createSession, currentSession, isTogglingPin, workspaceId]);
 
+  // remove the old content to trigger re-mount
+  // to avoid infinitely load and mount, should not make `chatContent` as dependency
+  const reMountChatContent = useCallback(() => {
+    setChatContent(prev => {
+      prev?.remove();
+      return null;
+    });
+  }, []);
+
   const onOpenSession = useCallback(
     (sessionId: string) => {
       if (isOpeningSession) return;
@@ -155,10 +165,7 @@ export const Component = () => {
         .getSession(workspaceId, sessionId)
         .then(session => {
           setCurrentSession(session);
-          if (chatContent) {
-            chatContent.remove();
-            setChatContent(null);
-          }
+          reMountChatContent();
           chatTool?.closeHistoryMenu();
         })
         .catch(console.error)
@@ -166,12 +173,19 @@ export const Component = () => {
           setIsOpeningSession(false);
         });
     },
-    [chatContent, chatTool, client, isOpeningSession, workspaceId]
+    [chatTool, client, isOpeningSession, reMountChatContent, workspaceId]
   );
 
   const onContextChange = useCallback((context: Partial<ChatContextValue>) => {
     setStatus(context.status ?? 'idle');
   }, []);
+
+  const onOpenDoc = useCallback(
+    (docId: string) => {
+      workbench.openDoc(docId, { at: 'active' });
+    },
+    [workbench]
+  );
 
   const confirmModal = useConfirmModal();
   const specs = useAISpecs();
@@ -208,6 +222,7 @@ export const Component = () => {
       confirmModal.openConfirmModal
     );
     content.createSession = createSession;
+    content.onOpenDoc = onOpenDoc;
 
     if (!chatContent) {
       // initial values that won't change
@@ -232,11 +247,12 @@ export const Component = () => {
     confirmModal,
     onContextChange,
     specs,
+    onOpenDoc,
   ]);
 
   // init or update header ai-chat-toolbar
   useEffect(() => {
-    if (!isHeaderProvided || !chatToolContainerRef.current || !chatContent) {
+    if (!isHeaderProvided || !chatToolContainerRef.current) {
       return;
     }
     let tool = chatTool;
@@ -258,8 +274,7 @@ export const Component = () => {
     tool.onNewSession = () => {
       if (!currentSession) return;
       setCurrentSession(null);
-      chatContent?.remove();
-      setChatContent(null);
+      reMountChatContent();
     };
 
     tool.onTogglePin = async () => {
@@ -281,7 +296,6 @@ export const Component = () => {
       setChatTool(tool);
     }
   }, [
-    chatContent,
     chatTool,
     currentSession,
     docDisplayConfig,
@@ -292,6 +306,7 @@ export const Component = () => {
     confirmModal,
     framework,
     status,
+    reMountChatContent,
   ]);
 
   useEffect(() => {
@@ -312,8 +327,6 @@ export const Component = () => {
 
   // restore pinned session
   useEffect(() => {
-    if (!chatContent) return;
-
     const controller = new AbortController();
     const signal = controller.signal;
     client
@@ -329,10 +342,7 @@ export const Component = () => {
         const session = sessions[0];
         if (!session) return;
         setCurrentSession(session);
-        if (chatContent) {
-          chatContent.remove();
-          setChatContent(null);
-        }
+        reMountChatContent();
       })
       .catch(console.error);
 
@@ -340,7 +350,7 @@ export const Component = () => {
     return () => {
       controller.abort();
     };
-  }, [chatContent, client, workspaceId]);
+  }, [client, reMountChatContent, workspaceId]);
 
   const onChatContainerRef = useCallback((node: HTMLDivElement) => {
     if (node) {

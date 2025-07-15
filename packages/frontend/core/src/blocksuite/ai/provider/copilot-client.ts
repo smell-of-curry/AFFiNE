@@ -4,6 +4,7 @@ import {
   addContextCategoryMutation,
   addContextDocMutation,
   addContextFileMutation,
+  applyDocUpdatesQuery,
   cleanupCopilotSessionMutation,
   createCopilotContextMutation,
   createCopilotMessageMutation,
@@ -185,13 +186,18 @@ export class CopilotClient {
     }
   }
 
-  async getRecentSessions(workspaceId: string, limit?: number) {
+  async getRecentSessions(
+    workspaceId: string,
+    limit?: number,
+    offset?: number
+  ) {
     try {
       const res = await this.gql({
         query: getCopilotRecentSessionsQuery,
         variables: {
           workspaceId,
           limit,
+          offset,
         },
       });
       return res.currentUser?.copilot?.chats.edges.map(e => e.node);
@@ -499,5 +505,22 @@ export class CopilotClient {
       query: getWorkspaceEmbeddingStatusQuery,
       variables: { workspaceId },
     }).then(res => res.queryWorkspaceEmbeddingStatus);
+  }
+
+  applyDocUpdates(
+    workspaceId: string,
+    docId: string,
+    op: string,
+    updates: string
+  ) {
+    return this.gql({
+      query: applyDocUpdatesQuery,
+      variables: {
+        workspaceId,
+        docId,
+        op,
+        updates,
+      },
+    }).then(res => res.applyDocUpdates);
   }
 }
